@@ -6,7 +6,7 @@
 
 //═════════ ALTERAR POR CONJUNTO ═════════   
 const int CANAL_ESPECIFICO = 1;     
-uint8_t macTransmissor[] = {0x1C, 0x69, 0x20, 0xA2, 0xE2, 0x14};
+uint8_t macTransmissor[] = {0x1C, 0x69, 0x20, 0xA2, 0xE2, 0x14}; 
 
 //═════════ Struct da mensagem ESP-NOW ═════════
 typedef struct {
@@ -19,6 +19,7 @@ typedef struct {
 static struct_message MIDImessage;
 static struct_message bufferMessage;
 volatile bool newData = false;
+bool serialAtivo = false; // só imprime depois que contato_cli mandar START
 portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED; // mutex contra race condition
 
 void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len) {
@@ -33,6 +34,7 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len) {
 
 void setup() {
     Serial.begin(115200);
+    Serial.setTimeout(1);
     esp_log_level_set("*", ESP_LOG_NONE);
 
     WiFi.mode(WIFI_STA);
@@ -51,6 +53,19 @@ void setup() {
 }
 
 void loop() {
+// Comando não bloqueante vindo do contato_cli: START / STOP
+    if (Serial.available() > 0) {
+        char cmd[16] = {0};
+
+        Serial.readBytesUntil('\n', cmd, sizeof(cmd) - 1);
+
+        if (strcmp(cmd, "START") == 0) {
+            serialAtivo = true;
+        } 
+        else if (strcmp(cmd, "STOP") == 0) {
+            serialAtivo = false;
+        }
+    }
     if (newData) {
         portENTER_CRITICAL(&mux);
         memcpy(&bufferMessage, &MIDImessage, sizeof(MIDImessage));
@@ -63,6 +78,10 @@ void loop() {
                  bufferMessage.gyro,
                  bufferMessage.accel,
                  bufferMessage.touch);
-        Serial.println(buf);
+
+        int len = strlen(buf) + 2;
+        if (serialAtivo && Serial.availableForWrite() >= len) {
+            Serial.println(buf);
+        }
     }
 }
