@@ -28,6 +28,11 @@ typedef struct {
     uint32_t timestamp;
 } beacon_t;
 
+// ═════════ Struct controle da base individual ═════════
+typedef struct {
+    uint8_t ativo;
+} controle_t;
+
 // ═════════ Struct mensagem para base individual ═════════
 typedef struct {
     uint8_t  id;
@@ -52,14 +57,24 @@ float       ypr[3];
 message_t message;
 esp_now_peer_info_t peerInfo;
 volatile bool meu_slot_aberto = false;
+volatile bool transmissaoAtiva = false;
 
-// ═════════ Callback beacon ═════════
+// ═════════ Callback beacon/controle ═════════
 void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len) {
-    if (len != sizeof(beacon_t)) return;
-    beacon_t beacon;
-    memcpy(&beacon, incomingData, sizeof(beacon_t));
-    if (beacon.slot_atual == MEU_SLOT) {
-        meu_slot_aberto = true;
+    if (len == sizeof(beacon_t)) {
+        beacon_t beacon;
+        memcpy(&beacon, incomingData, sizeof(beacon_t));
+        if (beacon.slot_atual == MEU_SLOT) {
+            meu_slot_aberto = true;
+        }
+        return;
+    }
+
+    if (len == sizeof(controle_t)) {
+        controle_t controle;
+        memcpy(&controle, incomingData, sizeof(controle_t));
+        transmissaoAtiva = (controle.ativo == 1);
+        return;
     }
 }
 
@@ -141,7 +156,7 @@ void setup() {
         return;
     }
 
-    // Recebe beacon da base mestre
+    // Recebe beacon da base mestre e controle da base individual
     esp_now_register_recv_cb(OnDataRecv);
 
     // Peer da base individual
@@ -163,7 +178,10 @@ void loop() {
     // Envia o dado mais recente disponível imediatamente quando o beacon chega
     if (meu_slot_aberto) {
         meu_slot_aberto = false;
-        esp_now_send(broadcastAddress, (uint8_t *)&message, sizeof(message));
+
+        if (transmissaoAtiva) {
+            esp_now_send(broadcastAddress, (uint8_t *)&message, sizeof(message));
+        }
     }
 
     // Atualiza dados do sensor em paralelo
