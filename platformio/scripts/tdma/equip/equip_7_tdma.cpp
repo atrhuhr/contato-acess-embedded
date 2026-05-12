@@ -28,11 +28,6 @@ typedef struct {
     uint32_t timestamp;
 } beacon_t;
 
-// ═════════ Struct controle da base individual ═════════
-typedef struct {
-    uint8_t ativo;
-} controle_t;
-
 // ═════════ Struct mensagem para base individual ═════════
 typedef struct {
     uint8_t  id;
@@ -58,6 +53,11 @@ message_t message;
 esp_now_peer_info_t peerInfo;
 volatile bool meu_slot_aberto = false;
 volatile bool transmissaoAtiva = false;
+
+// ═════════ Struct controle da base individual ═════════
+typedef struct {
+    uint8_t ativo;
+} controle_t;
 
 // ═════════ Callback beacon/controle ═════════
 void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len) {
@@ -110,10 +110,10 @@ void setup() {
 
     // Offsets antes do resetFIFO — ordem correta
     #ifndef AUTO_CALLIBRATION
-        mpu.setZAccelOffset(1098);
-        mpu.setXGyroOffset(177);
-        mpu.setYGyroOffset(78);
-        mpu.setZGyroOffset(1);
+        mpu.setZAccelOffset(1590);
+        mpu.setXGyroOffset(166);
+        mpu.setYGyroOffset(-44);
+        mpu.setZGyroOffset(49);
     #endif
 
     if (dev_status == 0) {
@@ -156,7 +156,7 @@ void setup() {
         return;
     }
 
-    // Recebe beacon da base mestre e controle da base individual
+    // Recebe beacon da base mestre
     esp_now_register_recv_cb(OnDataRecv);
 
     // Peer da base individual
@@ -174,17 +174,6 @@ void setup() {
 void loop() {
     if (!dmp_ready) return;
 
-    // Verifica slot primeiro — não depende do FIFO estar pronto
-    // Envia o dado mais recente disponível imediatamente quando o beacon chega
-    if (meu_slot_aberto) {
-        meu_slot_aberto = false;
-
-        if (transmissaoAtiva) {
-            esp_now_send(broadcastAddress, (uint8_t *)&message, sizeof(message));
-        }
-    }
-
-    // Atualiza dados do sensor em paralelo
     if (mpu.dmpGetCurrentFIFOPacket(fifo_buffer)) {
         mpu.dmpGetQuaternion(&q, fifo_buffer);
         mpu.dmpGetGravity(&gravity, &q);
@@ -203,6 +192,15 @@ void loop() {
                      message.id, message.gyro, message.accel, message.touch);
             Serial.println(buf);
         #endif
+    } else {
+        delay(1);
     }
-    // sem delay(1) — loop roda livre para não perder beacons
+
+    // Transmite apenas quando a base mestre abrir o slot
+    if (meu_slot_aberto) {
+        meu_slot_aberto = false;
+        if (transmissaoAtiva) {
+            esp_now_send(broadcastAddress, (uint8_t *)&message, sizeof(message));
+        }
+    }
 }

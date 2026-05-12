@@ -52,14 +52,29 @@ float       ypr[3];
 message_t message;
 esp_now_peer_info_t peerInfo;
 volatile bool meu_slot_aberto = false;
+volatile bool transmissaoAtiva = false;
 
-// ═════════ Callback beacon ═════════
+// ═════════ Struct controle da base individual ═════════
+typedef struct {
+    uint8_t ativo;
+} controle_t;
+
+// ═════════ Callback beacon/controle ═════════
 void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len) {
-    if (len != sizeof(beacon_t)) return;
-    beacon_t beacon;
-    memcpy(&beacon, incomingData, sizeof(beacon_t));
-    if (beacon.slot_atual == MEU_SLOT) {
-        meu_slot_aberto = true;
+    if (len == sizeof(beacon_t)) {
+        beacon_t beacon;
+        memcpy(&beacon, incomingData, sizeof(beacon_t));
+        if (beacon.slot_atual == MEU_SLOT) {
+            meu_slot_aberto = true;
+        }
+        return;
+    }
+
+    if (len == sizeof(controle_t)) {
+        controle_t controle;
+        memcpy(&controle, incomingData, sizeof(controle_t));
+        transmissaoAtiva = (controle.ativo == 1);
+        return;
     }
 }
 
@@ -184,6 +199,8 @@ void loop() {
     // Transmite apenas quando a base mestre abrir o slot
     if (meu_slot_aberto) {
         meu_slot_aberto = false;
-        esp_now_send(broadcastAddress, (uint8_t *)&message, sizeof(message));
+        if (transmissaoAtiva) {
+            esp_now_send(broadcastAddress, (uint8_t *)&message, sizeof(message));
+        }
     }
 }

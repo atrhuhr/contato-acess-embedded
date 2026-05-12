@@ -20,7 +20,20 @@ static struct_message MIDImessage;
 static struct_message bufferMessage;
 volatile bool newData = false;
 bool serialAtivo = false; // só imprime depois que contato_cli mandar START
+uint32_t ultimoReenvio = 0;
+
+typedef struct {
+    uint8_t ativo;
+} controle_t;
+
+esp_now_peer_info_t peerEquip;
 portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED; // mutex contra race condition
+
+void enviarControle(uint8_t ativo) {
+    controle_t ctrl;
+    ctrl.ativo = ativo;
+    esp_now_send(macTransmissor, (uint8_t *)&ctrl, sizeof(ctrl));
+}
 
 void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len) {
     if (memcmp(mac_addr, macTransmissor, 6) != 0) return;
@@ -50,6 +63,12 @@ void setup() {
         return;
     }
     esp_now_register_recv_cb(OnDataRecv);
+
+    memset(&peerEquip, 0, sizeof(peerEquip));
+    memcpy(peerEquip.peer_addr, macTransmissor, 6);
+    peerEquip.channel = 0;
+    peerEquip.encrypt = false;
+    esp_now_add_peer(&peerEquip);
 }
 
 void loop() {
@@ -61,11 +80,19 @@ void loop() {
 
         if (strcmp(cmd, "START") == 0) {
             serialAtivo = true;
+            enviarControle(1);
+            ultimoReenvio = millis();
         } 
         else if (strcmp(cmd, "STOP") == 0) {
             serialAtivo = false;
+            enviarControle(0);
         }
     }
+    if (serialAtivo && (millis() - ultimoReenvio >= 2000)) {
+        ultimoReenvio = millis();
+        enviarControle(1);
+    }
+
     if (newData) {
         portENTER_CRITICAL(&mux);
         memcpy(&bufferMessage, &MIDImessage, sizeof(MIDImessage));

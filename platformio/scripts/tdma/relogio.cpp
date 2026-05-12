@@ -1,25 +1,21 @@
 // ═════════ BASE MESTRE TDMA ═════════
 // Envia beacon de sincronização para todos os equips
-// Cada equip recebe o beacon e calcula seu slot de transmissão
-// Canal 8, ciclo de 12ms (6 slots × 2ms cada)
+// Canal 8, ciclo de 6 slots × 1400µs = 8.4ms
 
 #include <esp_now.h>
 #include <WiFi.h>
 #include "esp_wifi.h"
 #include "esp_log.h"
 
-const int CANAL = 8;
-const int NUM_EQUIPS = 6;
-const int SLOT_MS = 1;                        // 1ms por slot
-const int CICLO_MS = NUM_EQUIPS * SLOT_MS;    // 6ms por ciclo completo
+const int      CANAL      = 1;
+const int      NUM_EQUIPS = 6;
+const uint32_t SLOT_US    = 1500; // ← altere aqui para testar diferentes slots
 
-// Endereço de broadcast para todos os equips
 uint8_t broadcastAddress[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
-// Estrutura do beacon
 typedef struct {
-    uint8_t slot_atual;   // slot que está sendo aberto (0 a 5)
-    uint32_t timestamp;   // timestamp do ciclo
+    uint8_t  slot_atual;
+    uint32_t timestamp;
 } beacon_t;
 beacon_t beacon;
 
@@ -46,7 +42,6 @@ void setup() {
         return;
     }
 
-    // Adiciona peer broadcast
     memset(&peerInfo, 0, sizeof(peerInfo));
     memcpy(peerInfo.peer_addr, broadcastAddress, 6);
     peerInfo.channel = 0;
@@ -57,16 +52,17 @@ void setup() {
     }
 
     Serial.println("Base mestre TDMA iniciada!");
-    Serial.print("Canal: "); Serial.println(CANAL);
-    Serial.print("Ciclo: "); Serial.print(CICLO_MS); Serial.println("ms");
-    Serial.print("Slot: "); Serial.print(SLOT_MS); Serial.println("ms");
+    Serial.print("Canal: ");      Serial.println(CANAL);
+    Serial.print("Equips: ");     Serial.println(NUM_EQUIPS);
+    Serial.print("Slot: ");       Serial.print(SLOT_US);    Serial.println(" µs");
+    Serial.print("Ciclo total: "); Serial.print(SLOT_US * NUM_EQUIPS); Serial.println(" µs");
 }
 
 void loop() {
     for (int slot = 0; slot < NUM_EQUIPS; slot++) {
         beacon.slot_atual = slot;
-        beacon.timestamp = millis();
+        beacon.timestamp  = micros();
         esp_now_send(broadcastAddress, (uint8_t *)&beacon, sizeof(beacon));
-        delay(SLOT_MS);
+        delayMicroseconds(SLOT_US);
     }
 }

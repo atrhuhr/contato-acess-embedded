@@ -53,8 +53,19 @@ message_t message;
 esp_now_peer_info_t peerInfo;
 volatile bool meu_slot_aberto = false;
 
+typedef struct {
+    uint8_t ativo;
+} ctrl_message;
+volatile bool ativo = false;
+
 // ═════════ Callback beacon ═════════
 void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len) {
+    if (len == sizeof(ctrl_message)) {
+        ctrl_message ctrl;
+        memcpy(&ctrl, incomingData, sizeof(ctrl));
+        ativo = ctrl.ativo;
+        return;
+    }
     if (len != sizeof(beacon_t)) return;
     beacon_t beacon;
     memcpy(&beacon, incomingData, sizeof(beacon_t));
@@ -184,6 +195,8 @@ void loop() {
     // Transmite apenas quando a base mestre abrir o slot
     if (meu_slot_aberto) {
         meu_slot_aberto = false;
-        esp_now_send(broadcastAddress, (uint8_t *)&message, sizeof(message));
+        if (ativo) {
+            esp_now_send(broadcastAddress, (uint8_t *)&message, sizeof(message));
+        }
     }
 }

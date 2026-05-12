@@ -20,12 +20,24 @@ static struct_message MIDImessage;
 static struct_message bufferMessage;
 volatile bool newData = false;
 bool serialAtivo = false; // só imprime depois que contato_cli mandar START
+uint32_t ultimoReenvio = 0;
 
-portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
+typedef struct {
+    uint8_t ativo;
+} controle_t;
+
+esp_now_peer_info_t peerEquip;
+portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED; // mutex contra race condition
+
+void enviarControle(uint8_t ativo) {
+    controle_t ctrl;
+    ctrl.ativo = ativo;
+    esp_now_send(macTransmissor, (uint8_t *)&ctrl, sizeof(ctrl));
+}
 
 void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len) {
     if (memcmp(mac_addr, macTransmissor, 6) != 0) return;
-    if (len != sizeof(struct_message)) return;
+    if (len != sizeof(struct_message)) return; // descarta pacote com tamanho errado
 
     portENTER_CRITICAL_ISR(&mux);
     memcpy(&MIDImessage, incomingData, sizeof(MIDImessage));
@@ -40,31 +52,45 @@ void setup() {
 
     WiFi.mode(WIFI_STA);
     esp_wifi_set_max_tx_power(82);
-
     esp_wifi_set_promiscuous(true);
     esp_wifi_set_channel(CANAL_ESPECIFICO, WIFI_SECOND_CHAN_NONE);
     esp_wifi_set_promiscuous(false);
-
+    // Preâmbulo longo: deve ser igual ao do equip
     esp_wifi_config_espnow_rate(WIFI_IF_STA, WIFI_PHY_RATE_1M_L);
 
     if (esp_now_init() != ESP_OK) {
         Serial.println("Erro ao inicializar ESP-NOW");
         return;
     }
-esp_now_register_recv_cb(OnDataRecv);
+    esp_now_register_recv_cb(OnDataRecv);
+
+    memset(&peerEquip, 0, sizeof(peerEquip));
+    memcpy(peerEquip.peer_addr, macTransmissor, 6);
+    peerEquip.channel = 0;
+    peerEquip.encrypt = false;
+    esp_now_add_peer(&peerEquip);
 }
 
 void loop() {
-    // Comando não bloqueante vindo do contato_cli: START / STOP
+// Comando não bloqueante vindo do contato_cli: START / STOP
     if (Serial.available() > 0) {
         char cmd[16] = {0};
+
         Serial.readBytesUntil('\n', cmd, sizeof(cmd) - 1);
 
         if (strcmp(cmd, "START") == 0) {
             serialAtivo = true;
-        } else if (strcmp(cmd, "STOP") == 0) {
+            enviarControle(1);
+            ultimoReenvio = millis();
+        } 
+        else if (strcmp(cmd, "STOP") == 0) {
             serialAtivo = false;
+            enviarControle(0);
         }
+    }
+    if (serialAtivo && (millis() - ultimoReenvio >= 2000)) {
+        ultimoReenvio = millis();
+        enviarControle(1);
     }
 
     if (newData) {
