@@ -7,6 +7,7 @@
 //═════════ ALTERAR POR CONJUNTO ═════════   
 const int CANAL_ESPECIFICO = 1;     
 uint8_t macTransmissor[] = {0x1C, 0x69, 0x20, 0xA4, 0x14, 0x94}; 
+const uint8_t BASE_ID = 5;
 
 //═════════ Struct da mensagem ESP-NOW ═════════
 typedef struct {
@@ -19,7 +20,7 @@ typedef struct {
 static struct_message MIDImessage;
 static struct_message bufferMessage;
 volatile bool newData = false;
-bool serialAtivo = true; // só imprime depois que contato_cli mandar START
+bool serialAtivo = false; // só imprime depois que contato_cli mandar START
 uint32_t ultimoReenvio = 0;
 
 typedef struct {
@@ -48,6 +49,9 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len) {
 void setup() {
     Serial.begin(115200);
     Serial.setTimeout(1);
+
+    Serial.print("ID/");
+    Serial.println(BASE_ID);
     esp_log_level_set("*", ESP_LOG_NONE);
 
     WiFi.mode(WIFI_STA);
