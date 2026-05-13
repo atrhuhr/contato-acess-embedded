@@ -7,6 +7,7 @@
 //═════════ ALTERAR POR CONJUNTO ═════════   
 const int CANAL_ESPECIFICO = 1;     
 uint8_t macTransmissor[] = {0x1C, 0x69, 0x20, 0xA2, 0xE2, 0x14}; 
+const uint8_t BASE_ID = 8;
 
 //═════════ Struct da mensagem ESP-NOW ═════════
 typedef struct {
@@ -19,8 +20,8 @@ typedef struct {
 static struct_message MIDImessage;
 static struct_message bufferMessage;
 volatile bool newData = false;
-bool serialAtivo = true; // só imprime depois que contato_cli mandar START
-uint32_t ultimoReenvio = 0;
+bool serialAtivo = false; // só imprime depois que contato_cli mandar START
+uint32_t ultimoStart = 0;
 
 typedef struct {
     uint8_t ativo;
@@ -48,6 +49,9 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len) {
 void setup() {
     Serial.begin(115200);
     Serial.setTimeout(1);
+    
+    Serial.print("ID/");
+    Serial.println(BASE_ID);
     esp_log_level_set("*", ESP_LOG_NONE);
 
     WiFi.mode(WIFI_STA);
@@ -81,16 +85,16 @@ void loop() {
         if (strcmp(cmd, "START") == 0) {
             serialAtivo = true;
             enviarControle(1);
-            ultimoReenvio = millis();
+            ultimoStart = millis();
         } 
         else if (strcmp(cmd, "STOP") == 0) {
             serialAtivo = false;
             enviarControle(0);
         }
     }
-    if (serialAtivo && (millis() - ultimoReenvio >= 2000)) {
-        ultimoReenvio = millis();
-        enviarControle(1);
+    if (serialAtivo && (millis() - ultimoStart >= 3000)) {
+        serialAtivo = false;
+        enviarControle(0);
     }
 
     if (newData) {
