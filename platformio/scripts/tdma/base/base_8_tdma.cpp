@@ -7,6 +7,7 @@
 //═════════ ALTERAR POR CONJUNTO ═════════   
 const int CANAL_ESPECIFICO = 1;     
 uint8_t macTransmissor[] = {0x1C, 0x69, 0x20, 0xA2, 0xE2, 0x14}; 
+
 //═════════ Struct da mensagem ESP-NOW ═════════
 typedef struct {
     uint8_t  id;
@@ -87,11 +88,10 @@ void loop() {
             enviarControle(0);
         }
     }
-    if (serialAtivo && (millis() - ultimoStart >= 3000)) {
-        serialAtivo = false;
-        enviarControle(0);
+    if (serialAtivo && (millis() - ultimoStart >= 2000)) {
+        ultimoStart = millis();
+        enviarControle(1);
     }
-
     if (newData) {
         portENTER_CRITICAL(&mux);
         memcpy(&bufferMessage, &MIDImessage, sizeof(MIDImessage));
