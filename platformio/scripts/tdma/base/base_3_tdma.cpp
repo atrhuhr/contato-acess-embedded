@@ -88,12 +88,10 @@ void loop() {
             enviarControle(0);
         }
     }
-        if (serialAtivo && (millis() - ultimoStart >= 2000)) {
-            ultimoStart = millis();
-            enviarControle(1);
-        }
+    if (serialAtivo && (millis() - ultimoStart >= 2000)) {
+        ultimoStart = millis();
+        enviarControle(1);
     }
-
     if (newData) {
         portENTER_CRITICAL(&mux);
         memcpy(&bufferMessage, &MIDImessage, sizeof(MIDImessage));
