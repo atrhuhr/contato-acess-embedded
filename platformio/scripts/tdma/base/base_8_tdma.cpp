@@ -19,7 +19,7 @@ typedef struct {
 static struct_message MIDImessage;
 static struct_message bufferMessage;
 volatile bool newData = false;
-bool serialAtivo = false; // só imprime depois que contato_cli mandar START
+bool serialAtivo = true; // só imprime depois que contato_cli mandar START
 uint32_t ultimoReenvio = 0;
 
 typedef struct {
