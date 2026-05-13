@@ -7,7 +7,6 @@
 //═════════ ALTERAR POR CONJUNTO ═════════   
 const int CANAL_ESPECIFICO = 1;     
 uint8_t macTransmissor[] = {0x68, 0x25, 0xDD, 0x32, 0x88, 0xB4}; 
-const uint8_t BASE_ID = 3;
 
 //═════════ Struct da mensagem ESP-NOW ═════════
 typedef struct {

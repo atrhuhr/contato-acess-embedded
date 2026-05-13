@@ -6,7 +6,7 @@
 
 //═════════ ALTERAR POR CONJUNTO ═════════   
 const int CANAL_ESPECIFICO = 1;     
-uint8_t macTransmissor[] = {0x1C, 0x69, 0x20, 0xA4, 0x14, 0x94}; 
+uint8_t macTransmissor[] = {0x68, 0x25, 0xDD, 0x32, 0x88, 0xB4}; 
 
 //═════════ Struct da mensagem ESP-NOW ═════════
 typedef struct {
@@ -48,7 +48,6 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len) {
 void setup() {
     Serial.begin(115200);
     Serial.setTimeout(1);
-
     esp_log_level_set("*", ESP_LOG_NONE);
 
     WiFi.mode(WIFI_STA);
