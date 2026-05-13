@@ -88,9 +88,10 @@ void loop() {
             enviarControle(0);
         }
     }
-    if (serialAtivo && (millis() - ultimoStart >= 3000)) {
-        serialAtivo = false;
-        enviarControle(0);
+        if (serialAtivo && (millis() - ultimoStart >= 2000)) {
+            ultimoStart = millis();
+            enviarControle(1);
+        }
     }
 
     if (newData) {
