@@ -7,6 +7,7 @@
 //═════════ ALTERAR POR CONJUNTO ═════════   
 const int CANAL_ESPECIFICO = 1;     
 uint8_t macTransmissor[] = {0x14, 0x33, 0x5C, 0x52, 0x4D, 0xE0};
+const uint8_t BASE_ID = 4;
 
 //═════════ Struct da mensagem ESP-NOW ═════════
 typedef struct {
@@ -49,6 +50,11 @@ void setup() {
     Serial.begin(115200);
     Serial.setTimeout(1);
     
+<<<<<<< HEAD
+=======
+    Serial.print("ID/");
+    Serial.println(BASE_ID);
+>>>>>>> c2930689b015ea6dcb970d20db407d87cb2f7c70
     esp_log_level_set("*", ESP_LOG_NONE);
 
     WiFi.mode(WIFI_STA);
