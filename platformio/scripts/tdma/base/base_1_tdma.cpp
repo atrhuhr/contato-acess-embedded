@@ -1,7 +1,6 @@
 //═════════ Bibliotecas ═════════
 #include <esp_now.h>                    
 #include <WiFi.h>                       
-#include "Wire.h"                      
 #include "esp_wifi.h"   
 
 //═════════ ALTERAR POR CONJUNTO ═════════   
