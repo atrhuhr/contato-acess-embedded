@@ -99,7 +99,6 @@ void loop() {
         ultimoReenvio = millis();
         enviarControle(1);
     }
-
     if (newData) {
         portENTER_CRITICAL(&mux);
         memcpy(&bufferMessage, &MIDImessage, sizeof(MIDImessage));

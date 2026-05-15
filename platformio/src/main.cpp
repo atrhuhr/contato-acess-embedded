@@ -6,6 +6,7 @@
 //═════════ ALTERAR POR CONJUNTO ═════════   
 const int CANAL_ESPECIFICO = 1;     
 uint8_t macTransmissor[] = {0x14, 0x33, 0x5C, 0x52, 0x4D, 0xE0};
+uint8_t macTransmissor[] = {0x14, 0x33, 0x5C, 0x52, 0x4D, 0xE0};
 const uint8_t BASE_ID = 4;
 
 //═════════ Struct da mensagem ESP-NOW ═════════
@@ -95,11 +96,13 @@ void loop() {
             Serial.println(BASE_ID);
         }
     }
+    if (serialAtivo && (millis() - ultimoStart >= 2000)) {
+        ultimoStart = millis();
+        enviarControle(1);
     if (serialAtivo && (millis() - ultimoReenvio >= 2000)) {
         ultimoReenvio = millis();
         enviarControle(1);
     }
-
     if (newData) {
         portENTER_CRITICAL(&mux);
         memcpy(&bufferMessage, &MIDImessage, sizeof(MIDImessage));
