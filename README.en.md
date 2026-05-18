@@ -25,29 +25,3 @@ contato_hardware/
         ├── config.h  # pins, BLE UUIDs, MIDI and timing constants
         └── types.h   # data structs (StatusPacket, MPUOffsets)
 ```
-
-## Build and upload
-
-Requires [PlatformIO](https://platformio.org/) (CLI or VSCode extension).
-
-```bash
-cd platformio
-
-# Build
-platformio run -e esp32doit-devkit-v1
-
-# Build and flash to device
-platformio run --target upload -e esp32doit-devkit-v1
-
-# Serial monitor (115200 baud)
-platformio device monitor --speed 115200
-```
-
-## Hardware
-
-| Component | Description |
-|---|---|
-| ESP32 DEVKIT V1 | Main microcontroller |
-| MPU6050 | 6-axis IMU (I2C, 400 kHz) |
-| GPIO 2 | BLE connection indicator LED |
-| GPIO T3 | Capacitive touch sensor |
