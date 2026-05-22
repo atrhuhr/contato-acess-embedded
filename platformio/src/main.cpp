@@ -1,13 +1,12 @@
 //═════════ Bibliotecas ═════════
 #include <esp_now.h>                    
 #include <WiFi.h>                       
-#include "esp_wifi.h"   
+#include "esp_wifi.h"    
 
 //═════════ ALTERAR POR CONJUNTO ═════════   
 const int CANAL_ESPECIFICO = 1;     
-uint8_t macTransmissor[] = {0x14, 0x33, 0x5C, 0x52, 0x4D, 0xE0};
-uint8_t macTransmissor[] = {0x14, 0x33, 0x5C, 0x52, 0x4D, 0xE0};
-const uint8_t BASE_ID = 4;
+uint8_t macTransmissor[] = {0x3C, 0x8A, 0x1F, 0x80, 0x76, 0xA4}; 
+const uint8_t BASE_ID = 7;
 
 //═════════ Struct da mensagem ESP-NOW ═════════
 typedef struct {
@@ -50,8 +49,7 @@ void setup() {
     Serial.begin(115200);
     Serial.setTimeout(1);
 
-    Serial.print("ID/");
-    Serial.println(BASE_ID);
+
     esp_log_level_set("*", ESP_LOG_NONE);
 
     WiFi.mode(WIFI_STA);
@@ -96,9 +94,6 @@ void loop() {
             Serial.println(BASE_ID);
         }
     }
-    if (serialAtivo && (millis() - ultimoStart >= 2000)) {
-        ultimoStart = millis();
-        enviarControle(1);
     if (serialAtivo && (millis() - ultimoReenvio >= 2000)) {
         ultimoReenvio = millis();
         enviarControle(1);

@@ -49,8 +49,6 @@ void setup() {
     Serial.begin(115200);
     Serial.setTimeout(1);
 
-    Serial.print("ID/");
-    Serial.println(BASE_ID);
     esp_log_level_set("*", ESP_LOG_NONE);
 
     WiFi.mode(WIFI_STA);
