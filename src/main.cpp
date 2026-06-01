@@ -155,13 +155,11 @@ void setup() {
 
     // MIDI characteristic
     midiChar.setProperties(CHR_PROPS_READ | CHR_PROPS_WRITE_WO_RESP | CHR_PROPS_NOTIFY);
-    midiChar.setPermission(SECMODE_OPEN, SECMODE_OPEN);
     midiChar.setFixedLen(5);
     midiChar.begin();
 
     // Sections
     sectionsChar.setProperties(CHR_PROPS_READ | CHR_PROPS_WRITE);
-    sectionsChar.setPermission(SECMODE_OPEN, SECMODE_OPEN);
     sectionsChar.setMaxLen(32);
     sectionsChar.setWriteCallback(onSectionsWrite);
     sectionsChar.begin();
@@ -170,7 +168,6 @@ void setup() {
 
     // Accel sensitivity
     accelSensChar.setProperties(CHR_PROPS_READ | CHR_PROPS_WRITE);
-    accelSensChar.setPermission(SECMODE_OPEN, SECMODE_OPEN);
     accelSensChar.setFixedLen(4);
     accelSensChar.setWriteCallback(onAccelSensWrite);
     accelSensChar.begin();
@@ -178,7 +175,6 @@ void setup() {
 
     // Direction flip
     dirChar.setProperties(CHR_PROPS_READ | CHR_PROPS_WRITE);
-    dirChar.setPermission(SECMODE_OPEN, SECMODE_OPEN);
     dirChar.setFixedLen(1);
     dirChar.setWriteCallback(onDirWrite);
     dirChar.begin();
@@ -186,13 +182,11 @@ void setup() {
 
     // Status notify
     statusChar.setProperties(CHR_PROPS_NOTIFY);
-    statusChar.setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS);
     statusChar.setFixedLen(sizeof(StatusPacket));
     statusChar.begin();
 
     // Calibrate
     calibrateChar.setProperties(CHR_PROPS_WRITE);
-    calibrateChar.setPermission(SECMODE_OPEN, SECMODE_OPEN);
     calibrateChar.setFixedLen(1);
     calibrateChar.setWriteCallback(onCalibrateWrite);
     calibrateChar.begin();
