@@ -1,31 +1,257 @@
 #include <Arduino.h>
+#include <bluefruit.h>
+#include <Adafruit_LittleFS.h>
+#include <InternalFileSystem.h>
 #include "LSM6DS3.h"
-#include "Wire.h"
+#include <Wire.h>
+#include "config.h"
+#include "types.h"
 
-#define IMU_PWR_PIN PIN_LSM6DS3TR_C_POWER
+using namespace Adafruit_LittleFS_Namespace;
 
+// ─── BLE objects ─────────────────────────────────────────────────────────────
+BLEService        mainSvc(MAIN_SERVICE_UUID);
+BLECharacteristic midiChar(MIDI_CHAR_UUID);
+BLECharacteristic sectionsChar(SECTIONS_CHAR_UUID);
+BLECharacteristic accelSensChar(ACCEL_SENS_CHAR_UUID);
+BLECharacteristic dirChar(DIR_CHAR_UUID);
+BLECharacteristic statusChar(STATUS_CHAR_UUID);
+BLECharacteristic calibrateChar(CALIBRATE_CHAR_UUID);
+
+// ─── IMU ─────────────────────────────────────────────────────────────────────
 LSM6DS3 imu(I2C_MODE, 0x6A);
 
-void setup() {
-    Serial.begin(115200);
-    while (!Serial);
+// ─── State ───────────────────────────────────────────────────────────────────
+StatusPacket statusPkt;
 
-    pinMode(IMU_PWR_PIN, OUTPUT);
-    digitalWrite(IMU_PWR_PIN, HIGH);
-    delay(10);
+static float          elevationAngle = 0.0f;
+static const float    CF_ALPHA       = 0.96f;
+static const float    CF_DT          = STATUS_INTERVAL_MS / 1000.0f;
 
-    if (imu.begin() != 0)
-        Serial.println("IMU error");
-    else
-        Serial.println("IMU OK");
+int32_t       accelThreshold = DEFAULT_ACCEL_THRESHOLD;
+uint8_t       flipDir        = 1;
+uint8_t       notesBuf[32]   = {};
+uint16_t      notesLen       = 0;
+unsigned long lastSent       = 0;
+unsigned long lastAccel      = 0;
+unsigned long lastPrint      = 0;
+bool          accelFlag      = false;
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+static float clamp(float v, float hi, float lo) {
+    if (v > hi) return hi;
+    if (v < lo) return lo;
+    return v;
 }
 
+static void saveFile(const char *path, const void *data, size_t len) {
+    File f = InternalFS.open(path, FILE_O_WRITE);
+    if (f) { f.write((const uint8_t *)data, len); f.close(); }
+}
+
+static bool loadFile(const char *path, void *data, size_t len) {
+    File f = InternalFS.open(path, FILE_O_READ);
+    if (!f) return false;
+    f.read((uint8_t *)data, len);
+    f.close();
+    return true;
+}
+
+// ─── MIDI helpers ────────────────────────────────────────────────────────────
+static void sendMidi(uint8_t status, uint8_t d1, uint8_t d2) {
+    uint8_t pkt[5] = {0x80, 0x80, status, d1, d2};
+    midiChar.notify(pkt, 5);
+}
+
+static void playNote(uint8_t note, uint8_t channel) {
+    sendMidi(0x90 | (channel & 0x0F), note, 100);
+}
+
+static void stopNote(uint8_t note, uint8_t channel) {
+    sendMidi(0x80 | (channel & 0x0F), note, 0);
+}
+
+// ─── BLE callbacks ───────────────────────────────────────────────────────────
+static void onSectionsWrite(uint16_t /*conn*/, BLECharacteristic *chr,
+                             uint8_t *data, uint16_t len) {
+    if (len == 0 || len > 32) return;
+    memcpy(notesBuf, data, len);
+    notesLen = len;
+    saveFile(FILE_SECTIONS, notesBuf, notesLen);
+}
+
+static void onAccelSensWrite(uint16_t /*conn*/, BLECharacteristic *chr,
+                              uint8_t *data, uint16_t len) {
+    if (len < 4) return;
+    int32_t v;
+    memcpy(&v, data, 4);
+    v = constrain(v, MIN_ACCEL_THRESHOLD, MAX_ACCEL_THRESHOLD);
+    accelThreshold = v;
+    saveFile(FILE_SENS, &accelThreshold, sizeof(accelThreshold));
+}
+
+static void onDirWrite(uint16_t /*conn*/, BLECharacteristic *chr,
+                        uint8_t *data, uint16_t len) {
+    if (len < 1) return;
+    flipDir = data[0] ? 1 : 0;
+    saveFile(FILE_DIR, &flipDir, sizeof(flipDir));
+}
+
+static void onCalibrateWrite(uint16_t /*conn*/, BLECharacteristic *chr,
+                              uint8_t *data, uint16_t len) {
+    if (len < 1 || data[0] != 1) return;
+    elevationAngle = 0.0f;
+}
+
+static void onConnect(uint16_t /*conn*/) {
+    digitalWrite(LED_BUILTIN, LOW);
+}
+
+static void onDisconnect(uint16_t /*conn*/, uint8_t /*reason*/) {
+    digitalWrite(LED_BUILTIN, HIGH);
+}
+
+// ─── Setup ───────────────────────────────────────────────────────────────────
+void setup() {
+    Serial.begin(115200);
+
+    pinMode(LED_BUILTIN, OUTPUT);
+    digitalWrite(LED_BUILTIN, HIGH);
+
+    pinMode(PIN_LSM6DS3TR_C_POWER, OUTPUT);
+    digitalWrite(PIN_LSM6DS3TR_C_POWER, HIGH);
+    delay(10);
+
+    Wire.setClock(I2C_CLOCK_HZ);
+    if (imu.begin() != 0)
+        Serial.println("IMU error");
+
+    InternalFS.begin();
+
+    // Load persisted settings
+    uint8_t tmpNotes[32];
+    uint16_t tmpLen = 0;
+    if (loadFile(FILE_SECTIONS, tmpNotes, sizeof(tmpNotes))) {
+        // determine actual len by reading file size
+        File f = InternalFS.open(FILE_SECTIONS, FILE_O_READ);
+        if (f) { tmpLen = f.size(); f.close(); }
+        if (tmpLen > 0 && tmpLen <= 32) {
+            memcpy(notesBuf, tmpNotes, tmpLen);
+            notesLen = tmpLen;
+        }
+    }
+    loadFile(FILE_SENS, &accelThreshold, sizeof(accelThreshold));
+    loadFile(FILE_DIR,  &flipDir,        sizeof(flipDir));
+    accelThreshold = constrain(accelThreshold, MIN_ACCEL_THRESHOLD, MAX_ACCEL_THRESHOLD);
+
+    // BLE init
+    Bluefruit.begin();
+    Bluefruit.setName(DEVICE_NAME);
+    Bluefruit.Periph.setConnectCallback(onConnect);
+    Bluefruit.Periph.setDisconnectCallback(onDisconnect);
+
+    // Service
+    mainSvc.begin();
+
+    // MIDI characteristic
+    midiChar.setProperties(CHR_PROPS_READ | CHR_PROPS_WRITE_WO_RESP | CHR_PROPS_NOTIFY);
+    midiChar.setPermission(SECMODE_OPEN, SECMODE_OPEN);
+    midiChar.setFixedLen(5);
+    midiChar.begin();
+
+    // Sections
+    sectionsChar.setProperties(CHR_PROPS_READ | CHR_PROPS_WRITE);
+    sectionsChar.setPermission(SECMODE_OPEN, SECMODE_OPEN);
+    sectionsChar.setMaxLen(32);
+    sectionsChar.setWriteCallback(onSectionsWrite);
+    sectionsChar.begin();
+    if (notesLen > 0)
+        sectionsChar.write(notesBuf, notesLen);
+
+    // Accel sensitivity
+    accelSensChar.setProperties(CHR_PROPS_READ | CHR_PROPS_WRITE);
+    accelSensChar.setPermission(SECMODE_OPEN, SECMODE_OPEN);
+    accelSensChar.setFixedLen(4);
+    accelSensChar.setWriteCallback(onAccelSensWrite);
+    accelSensChar.begin();
+    accelSensChar.write32(accelThreshold);
+
+    // Direction flip
+    dirChar.setProperties(CHR_PROPS_READ | CHR_PROPS_WRITE);
+    dirChar.setPermission(SECMODE_OPEN, SECMODE_OPEN);
+    dirChar.setFixedLen(1);
+    dirChar.setWriteCallback(onDirWrite);
+    dirChar.begin();
+    dirChar.write8(flipDir);
+
+    // Status notify
+    statusChar.setProperties(CHR_PROPS_NOTIFY);
+    statusChar.setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS);
+    statusChar.setFixedLen(sizeof(StatusPacket));
+    statusChar.begin();
+
+    // Calibrate
+    calibrateChar.setProperties(CHR_PROPS_WRITE);
+    calibrateChar.setPermission(SECMODE_OPEN, SECMODE_OPEN);
+    calibrateChar.setFixedLen(1);
+    calibrateChar.setWriteCallback(onCalibrateWrite);
+    calibrateChar.begin();
+
+    // Advertising
+    Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
+    Bluefruit.Advertising.addService(mainSvc);
+    Bluefruit.ScanResponse.addName();
+    Bluefruit.Advertising.restartOnDisconnect(true);
+    Bluefruit.Advertising.start(0);
+
+    Serial.println("BLE started");
+}
+
+// ─── Loop ────────────────────────────────────────────────────────────────────
 void loop() {
-    Serial.print("Accel X:"); Serial.print(imu.readFloatAccelX(), 4);
-    Serial.print(" Y:");      Serial.print(imu.readFloatAccelY(), 4);
-    Serial.print(" Z:");      Serial.print(imu.readFloatAccelZ(), 4);
-    Serial.print("  Gyro X:"); Serial.print(imu.readFloatGyroX(), 4);
-    Serial.print(" Y:");       Serial.print(imu.readFloatGyroY(), 4);
-    Serial.print(" Z:");       Serial.println(imu.readFloatGyroZ(), 4);
-    delay(100);
+    unsigned long now = millis();
+    if (now - lastSent < STATUS_INTERVAL_MS) return;
+    lastSent = now;
+
+    float ax  = imu.readFloatAccelX();
+    float ay  = imu.readFloatAccelY();
+    float az  = imu.readFloatAccelZ();
+    float gyY = imu.readFloatGyroY();
+    (void)ay; (void)az;
+
+    // Elevation of forward (X) axis — yaw and roll invariant
+    float accelElevation = asinf(constrain(-ax, -1.0f, 1.0f)) * RAD_TO_DEG;
+    elevationAngle = CF_ALPHA * (elevationAngle + gyY * CF_DT)
+                   + (1.0f - CF_ALPHA) * accelElevation;
+
+    int gyro = (int)clamp(elevationAngle, GYRO_MAX_DEG, -GYRO_MAX_DEG);
+    if (flipDir) gyro = -gyro;
+
+    if (now - lastPrint >= 500) {
+        Serial.printf("elevation: %.1f\n", elevationAngle);
+        lastPrint = now;
+    }
+
+    int accel   = (int)(ax * 1000.0f);
+    int section = (int)((-gyro + GYRO_MAX_DEG) / (2.0f * GYRO_MAX_DEG) * notesLen);
+    if (section >= (int)notesLen) section = (int)notesLen - 1;
+    if (section < 0)              section = 0;
+
+    if (!accelFlag && abs(accel) > accelThreshold
+        && (now - lastAccel) >= ACCEL_DEBOUNCE_MS) {
+        if (Bluefruit.Periph.connected()) playNote(PERC_NOTE, PERC_CHANNEL);
+        accelFlag = true;
+        lastAccel = now;
+    }
+    if (accelFlag && (now - lastAccel) >= ACCEL_DEBOUNCE_MS) {
+        if (Bluefruit.Periph.connected()) stopNote(PERC_NOTE, PERC_CHANNEL);
+        accelFlag = false;
+    }
+
+    if (Bluefruit.Periph.connected()) {
+        statusPkt.gyro_x  = (int16_t)gyro;
+        statusPkt.accel_x = (int16_t)accel;
+        statusPkt.touch   = 0;
+        statusChar.notify((uint8_t *)&statusPkt, sizeof(StatusPacket));
+    }
 }
