@@ -155,7 +155,6 @@ void setup() {
 
     // MIDI characteristic
     midiChar.setProperties(CHR_PROPS_READ | CHR_PROPS_WRITE_WO_RESP | CHR_PROPS_NOTIFY);
-    midiChar.setFixedLen(5);
     midiChar.begin();
 
     // Sections
@@ -168,26 +167,22 @@ void setup() {
 
     // Accel sensitivity
     accelSensChar.setProperties(CHR_PROPS_READ | CHR_PROPS_WRITE);
-    accelSensChar.setFixedLen(4);
     accelSensChar.setWriteCallback(onAccelSensWrite);
     accelSensChar.begin();
     accelSensChar.write32(accelThreshold);
 
     // Direction flip
     dirChar.setProperties(CHR_PROPS_READ | CHR_PROPS_WRITE);
-    dirChar.setFixedLen(1);
     dirChar.setWriteCallback(onDirWrite);
     dirChar.begin();
     dirChar.write8(flipDir);
 
     // Status notify
     statusChar.setProperties(CHR_PROPS_NOTIFY);
-    statusChar.setFixedLen(sizeof(StatusPacket));
     statusChar.begin();
 
     // Calibrate
     calibrateChar.setProperties(CHR_PROPS_WRITE);
-    calibrateChar.setFixedLen(1);
     calibrateChar.setWriteCallback(onCalibrateWrite);
     calibrateChar.begin();
 
