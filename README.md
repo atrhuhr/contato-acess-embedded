@@ -1,8 +1,4 @@
-The project structure in the README matches the actual file tree — `platformio.ini`, `src/main.cpp`, `include/config.h`, and `include/types.h` are all present and correctly described. The last commit only changed one line in `config.h` with no structural impact. Nothing needs updating.
-
----
 # Contato (hardware)
-[![en](https://img.shields.io/badge/lang-en-red.svg)](README.en.md)
 
 Código embarcado para o dispositivo **Contato**, desenvolvido pelo curso de Dança da Universidade Federal do Rio de Janeiro em parceria com o Parque Tecnológico UFRJ.
 
