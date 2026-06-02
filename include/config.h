@@ -41,4 +41,4 @@ static const uint8_t PERC_CHANNEL = 8;
 
 static const int32_t DEFAULT_ACCEL_THRESHOLD = 5000;
 static const int32_t MIN_ACCEL_THRESHOLD     = 100;
-static const int32_t MAX_ACCEL_THRESHOLD     = 32000;
+static const int32_t MAX_ACCEL_THRESHOLD     = 28000;
