@@ -23,7 +23,7 @@ static const char *FILE_DIR        = "/dir.bin";
 static const char *FILE_IMU_OFFSETS= "/imu_offsets.bin";
 
 // ─── Calibração IMU ───────────────────────────────────────────────────────────
-static const unsigned long CALIB_DURATION_MS = 2000;
+static const unsigned long CALIB_DURATION_MS = 3000;
 
 // ─── Temporização ────────────────────────────────────────────────────────────
 static const unsigned long STATUS_INTERVAL_MS = 3;
