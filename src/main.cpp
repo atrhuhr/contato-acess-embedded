@@ -23,10 +23,11 @@ LSM6DS3 imu(I2C_MODE, 0x6A);
 
 // ─── State ───────────────────────────────────────────────────────────────────
 StatusPacket statusPkt;
+IMUOffsets    imuOffsets     = {};
 
-static float          elevationAngle = 0.0f;
-static const float    CF_ALPHA       = 0.96f;
-static const float    CF_DT          = STATUS_INTERVAL_MS / 1000.0f;
+static float          elevationAngle    = 0.0f;
+static const float    CF_ALPHA          = 0.90f;
+static bool           calibrationPending = false;
 
 int32_t       accelThreshold = DEFAULT_ACCEL_THRESHOLD;
 uint8_t       flipDir        = 1;
@@ -55,6 +56,36 @@ static bool loadFile(const char *path, void *data, size_t len) {
     f.read((uint8_t *)data, len);
     f.close();
     return true;
+}
+
+// ─── IMU calibration ─────────────────────────────────────────────────────────
+static void calibrateIMU() {
+    Serial.println("Calibrating IMU — hold still...");
+    double sumAx = 0, sumAy = 0, sumAz = 0;
+    double sumGx = 0, sumGy = 0, sumGz = 0;
+    int n = 0;
+    unsigned long start = millis();
+    while (millis() - start < CALIB_DURATION_MS) {
+        sumAx += imu.readFloatAccelX();
+        sumAy += imu.readFloatAccelY();
+        sumAz += imu.readFloatAccelZ();
+        sumGx += imu.readFloatGyroX();
+        sumGy += imu.readFloatGyroY();
+        sumGz += imu.readFloatGyroZ();
+        n++;
+        delay(4);
+    }
+    imuOffsets.ax = sumAx / n;
+    imuOffsets.ay = sumAy / n;
+    imuOffsets.az = sumAz / n;
+    imuOffsets.gx = sumGx / n;
+    imuOffsets.gy = sumGy / n;
+    imuOffsets.gz = sumGz / n;
+    elevationAngle = 0.0f;
+    saveFile(FILE_IMU_OFFSETS, &imuOffsets, sizeof(imuOffsets));
+    Serial.printf("Calibration done (%d samples). ax=%.4f ay=%.4f az=%.4f gx=%.4f gy=%.4f gz=%.4f\n",
+                  n, imuOffsets.ax, imuOffsets.ay, imuOffsets.az,
+                  imuOffsets.gx, imuOffsets.gy, imuOffsets.gz);
 }
 
 // ─── MIDI helpers ────────────────────────────────────────────────────────────
@@ -100,7 +131,7 @@ static void onDirWrite(uint16_t /*conn*/, BLECharacteristic *chr,
 static void onCalibrateWrite(uint16_t /*conn*/, BLECharacteristic *chr,
                               uint8_t *data, uint16_t len) {
     if (len < 1 || data[0] != 1) return;
-    elevationAngle = 0.0f;
+    calibrationPending = true;
 }
 
 static void onConnect(uint16_t /*conn*/) {
@@ -114,6 +145,8 @@ static void onDisconnect(uint16_t /*conn*/, uint8_t /*reason*/) {
 // ─── Setup ───────────────────────────────────────────────────────────────────
 void setup() {
     Serial.begin(115200);
+    unsigned long _t = millis();
+    while (!Serial && millis() - _t < 3000);
 
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, HIGH);
@@ -127,6 +160,14 @@ void setup() {
         Serial.println("IMU error");
 
     InternalFS.begin();
+
+    // IMU calibration — load stored offsets or run first-boot calibration
+    if (!loadFile(FILE_IMU_OFFSETS, &imuOffsets, sizeof(imuOffsets)))
+        calibrateIMU();
+    else
+        Serial.printf("Offsets loaded: ax=%.4f ay=%.4f az=%.4f gx=%.4f gy=%.4f gz=%.4f\n",
+                      imuOffsets.ax, imuOffsets.ay, imuOffsets.az,
+                      imuOffsets.gx, imuOffsets.gy, imuOffsets.gz);
 
     // Load persisted settings
     uint8_t tmpNotes[32];
@@ -169,7 +210,7 @@ void setup() {
     accelSensChar.setProperties(CHR_PROPS_READ | CHR_PROPS_WRITE);
     accelSensChar.setWriteCallback(onAccelSensWrite);
     accelSensChar.begin();
-    accelSensChar.write32(accelThreshold);
+    accelSensChar.write32((int)accelThreshold);
 
     // Direction flip
     dirChar.setProperties(CHR_PROPS_READ | CHR_PROPS_WRITE);
@@ -200,34 +241,41 @@ void setup() {
 void loop() {
     unsigned long now = millis();
     if (now - lastSent < STATUS_INTERVAL_MS) return;
+    float dt = (now - lastSent) / 1000.0f;
     lastSent = now;
 
-    float ax  = imu.readFloatAccelX();
-    float ay  = imu.readFloatAccelY();
-    float az  = imu.readFloatAccelZ();
-    float gyY = imu.readFloatGyroY();
-    (void)ay; (void)az;
+    if (calibrationPending) {
+        calibrationPending = false;
+        calibrateIMU();
+    }
 
-    // Elevation of forward (X) axis — yaw and roll invariant
-    float accelElevation = asinf(constrain(-ax, -1.0f, 1.0f)) * RAD_TO_DEG;
-    elevationAngle = CF_ALPHA * (elevationAngle + gyY * CF_DT)
+    float ay_raw = imu.readFloatAccelY();
+    float az_raw = imu.readFloatAccelZ();
+    float ax     = imu.readFloatAccelX() - imuOffsets.ax;
+    float gyY    = imu.readFloatGyroY()  - imuOffsets.gy;
+
+    // atan2 is stable across the full ±90° range; raw ay/az preserve the
+    // gravity vector magnitude so the denominator never collapses near ±90°
+    float accelElevation = atan2f(-ax, sqrtf(ay_raw*ay_raw + az_raw*az_raw)) * RAD_TO_DEG;
+    elevationAngle = CF_ALPHA * (elevationAngle + gyY * dt)
                    + (1.0f - CF_ALPHA) * accelElevation;
 
     int gyro = (int)clamp(elevationAngle, GYRO_MAX_DEG, -GYRO_MAX_DEG);
     if (flipDir) gyro = -gyro;
-
-    if (now - lastPrint >= 500) {
-        Serial.printf("elevation: %.1f\n", elevationAngle);
-        lastPrint = now;
-    }
 
     int accel   = (int)(ax * 1000.0f);
     int section = (int)((-gyro + GYRO_MAX_DEG) / (2.0f * GYRO_MAX_DEG) * notesLen);
     if (section >= (int)notesLen) section = (int)notesLen - 1;
     if (section < 0)              section = 0;
 
+    if (now - lastPrint >= 30) {
+        Serial.printf("elev=%d  accel=%d  thr=%d\n", (int)elevationAngle, accel, (int)accelThreshold);
+        lastPrint = now;
+    }
+
     if (!accelFlag && abs(accel) > accelThreshold
         && (now - lastAccel) >= ACCEL_DEBOUNCE_MS) {
+        Serial.printf("TRIGGER accel=%d\n", accel);
         if (Bluefruit.Periph.connected()) playNote(PERC_NOTE, PERC_CHANNEL);
         accelFlag = true;
         lastAccel = now;

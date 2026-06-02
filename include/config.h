@@ -17,9 +17,13 @@ static const char *DIR_CHAR_UUID       = "a1b2c3d4-0001-4b33-a751-6ce34ec4c701";
 static const char *CALIBRATE_CHAR_UUID = "b4d0c9f8-3b9a-4a4e-93f2-2a8c9f5ee7a2";
 
 // ─── Persistência LittleFS ───────────────────────────────────────────────────
-static const char *FILE_SECTIONS = "/sections.bin";
-static const char *FILE_SENS     = "/sens.bin";
-static const char *FILE_DIR      = "/dir.bin";
+static const char *FILE_SECTIONS   = "/sections.bin";
+static const char *FILE_SENS       = "/sens.bin";
+static const char *FILE_DIR        = "/dir.bin";
+static const char *FILE_IMU_OFFSETS= "/imu_offsets.bin";
+
+// ─── Calibração IMU ───────────────────────────────────────────────────────────
+static const unsigned long CALIB_DURATION_MS = 2000;
 
 // ─── Temporização ────────────────────────────────────────────────────────────
 static const unsigned long STATUS_INTERVAL_MS = 3;
@@ -35,6 +39,6 @@ static const uint8_t DEFAULT_NOTE          = 60;
 static const uint8_t PERC_NOTE    = 36;
 static const uint8_t PERC_CHANNEL = 8;
 
-static const int32_t DEFAULT_ACCEL_THRESHOLD = 10000;
+static const int32_t DEFAULT_ACCEL_THRESHOLD = 5000;
 static const int32_t MIN_ACCEL_THRESHOLD     = 100;
-static const int32_t MAX_ACCEL_THRESHOLD     = 32767;
+static const int32_t MAX_ACCEL_THRESHOLD     = 32000;
