@@ -35,10 +35,11 @@ int32_t       accelThreshold = DEFAULT_ACCEL_THRESHOLD;
 uint8_t       flipDir        = 1;
 uint8_t       notesBuf[32]   = {};
 uint16_t      notesLen       = 0;
-unsigned long lastSent       = 0; 
+unsigned long lastSent       = 0;
 unsigned long lastAccel      = 0;
-unsigned long lastPrint      = 0;
 bool          accelFlag      = false;
+bool          touchFlag      = false;
+uint8_t       lastNote       = 0;
 
 // -- Helpers --
 static float clamp(float v, float hi, float lo) {
@@ -95,14 +96,16 @@ static void calibrateIMU() {
 // https://www.geeksforgeeks.org/cpp/bitmasking-in-cpp/
 static void sendMidi(uint8_t status, uint8_t d1, uint8_t d2) {
     uint8_t pkt[5] = {0x80, 0x80, status, d1, d2};
-    midiChar.notify(pkt, 5); 
+    midiChar.notify(pkt, 5);
 }
 
 static void playNote(uint8_t note, uint8_t channel) {
+    lastNote = note;
     sendMidi(0x90 | (channel & 0x0F), note, 100);
 }
 
 static void stopNote(uint8_t note, uint8_t channel) {
+    lastNote = note;
     sendMidi(0x80 | (channel & 0x0F), note, 0);
 }
 
@@ -193,10 +196,12 @@ void setup() {
     accelThreshold = constrain(accelThreshold, MIN_ACCEL_THRESHOLD, MAX_ACCEL_THRESHOLD);
 
     // BLE init
+    Bluefruit.configPrphBandwidth(BANDWIDTH_HIGH);
     Bluefruit.begin();
     Bluefruit.setName(DEVICE_NAME);
     Bluefruit.Periph.setConnectCallback(onConnect);
     Bluefruit.Periph.setDisconnectCallback(onDisconnect);
+    Bluefruit.Periph.setConnInterval(6, 12); // request 7.5–15ms connection interval
 
     // Service
     mainSvc.begin();
@@ -278,9 +283,23 @@ void loop() {
     if (section >= (int)notesLen) section = (int)notesLen - 1;
     if (section < 0)              section = 0;
 
-    if (now - lastPrint >= 30) {
-        Serial.printf("elev=%d  accel=%d  thr=%d\n", (int)elevationAngle, accel, (int)accelThreshold);
-        lastPrint = now;
+    bool    touch       = statusPkt.touch;
+    uint8_t currentNote = (notesLen > 0) ? notesBuf[section] : DEFAULT_NOTES[0];
+
+    if (touch) {
+        if (!touchFlag) {
+            if (Bluefruit.Periph.connected()) playNote(currentNote, 0);
+            touchFlag = true;
+        }
+        if (currentNote != lastNote) {
+            Serial.printf("NOTE %d -> %d\n", lastNote, currentNote);
+            if (Bluefruit.Periph.connected()) { stopNote(lastNote, 0); playNote(currentNote, 0); }
+        }
+    } else {
+        if (touchFlag) {
+            if (Bluefruit.Periph.connected()) stopNote(lastNote, 0);
+            touchFlag = false;
+        }
     }
 
     // Gatilho acelerômetro
