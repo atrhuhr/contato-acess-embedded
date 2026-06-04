@@ -141,7 +141,8 @@ static void onCalibrateWrite(uint16_t /*conn*/, BLECharacteristic *chr,
     calibrationPending = true;
 }
 
-static void onConnect(uint16_t /*conn*/) {
+static void onConnect(uint16_t conn_handle) {
+    Bluefruit.Connection(conn_handle)->requestConnectionParameter(18, 24); 
     digitalWrite(LED_BUILTIN, LOW);
 }
 
@@ -196,12 +197,10 @@ void setup() {
     accelThreshold = constrain(accelThreshold, MIN_ACCEL_THRESHOLD, MAX_ACCEL_THRESHOLD);
 
     // BLE init
-    Bluefruit.configPrphBandwidth(BANDWIDTH_HIGH);
     Bluefruit.begin();
     Bluefruit.setName(DEVICE_NAME);
     Bluefruit.Periph.setConnectCallback(onConnect);
     Bluefruit.Periph.setDisconnectCallback(onDisconnect);
-    Bluefruit.Periph.setConnInterval(6, 12); // request 7.5–15ms connection interval
 
     // Service
     mainSvc.begin();
