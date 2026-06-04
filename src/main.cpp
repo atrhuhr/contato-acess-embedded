@@ -142,7 +142,7 @@ static void onCalibrateWrite(uint16_t /*conn*/, BLECharacteristic *chr,
 }
 
 static void onConnect(uint16_t conn_handle) {
-    Bluefruit.Connection(conn_handle)->requestConnectionParameter(18, 24); 
+    Bluefruit.Connection(conn_handle)->requestConnectionParameter(6, 12); 
     digitalWrite(LED_BUILTIN, LOW);
 }
 
@@ -291,7 +291,6 @@ void loop() {
             touchFlag = true;
         }
         if (currentNote != lastNote) {
-            Serial.printf("NOTE %d -> %d\n", lastNote, currentNote);
             if (Bluefruit.Periph.connected()) { stopNote(lastNote, 0); playNote(currentNote, 0); }
         }
     } else {

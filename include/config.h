@@ -26,7 +26,7 @@ static const char *FILE_IMU_OFFSETS= "/imu_offsets.bin";
 static const unsigned long CALIB_DURATION_MS = 5000;
 
 // -- Temporização --
-static const unsigned long STATUS_INTERVAL_MS = 30;
+static const unsigned long STATUS_INTERVAL_MS = 3;
 static const unsigned long ACCEL_DEBOUNCE_MS  = 2000;
 
 // -- Sensor --
