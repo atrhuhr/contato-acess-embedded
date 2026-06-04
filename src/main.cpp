@@ -7,9 +7,10 @@
 #include "config.h"
 #include "types.h"
 
-using namespace Adafruit_LittleFS_Namespace;
+using namespace Adafruit_LittleFS_Namespace; // Para usar a classe InternalFS: Sistema de arquivos interno permanente
 
-// ─── BLE objects ─────────────────────────────────────────────────────────────
+// -- BLE objects --  
+// https://en.wikipedia.org/wiki/Bluetooth_Low_Energy
 BLEService        mainSvc(MAIN_SERVICE_UUID);
 BLECharacteristic midiChar(MIDI_CHAR_UUID);
 BLECharacteristic sectionsChar(SECTIONS_CHAR_UUID);
@@ -18,27 +19,28 @@ BLECharacteristic dirChar(DIR_CHAR_UUID);
 BLECharacteristic statusChar(STATUS_CHAR_UUID);
 BLECharacteristic calibrateChar(CALIBRATE_CHAR_UUID);
 
-// ─── IMU ─────────────────────────────────────────────────────────────────────
+// -- IMU --
+// https://wiki.seeedstudio.com/XIAO-BLE-Sense-IMU-Usage/
 LSM6DS3 imu(I2C_MODE, 0x6A);
 
-// ─── State ───────────────────────────────────────────────────────────────────
+// -- State --
 StatusPacket statusPkt;
 IMUOffsets    imuOffsets     = {};
 
 static float          elevationAngle    = 0.0f;
-static const float    CF_ALPHA          = 0.90f;
+static const float    CF_ALPHA          = 0.96f;
 static bool           calibrationPending = false;
 
 int32_t       accelThreshold = DEFAULT_ACCEL_THRESHOLD;
 uint8_t       flipDir        = 1;
 uint8_t       notesBuf[32]   = {};
 uint16_t      notesLen       = 0;
-unsigned long lastSent       = 0;
+unsigned long lastSent       = 0; 
 unsigned long lastAccel      = 0;
 unsigned long lastPrint      = 0;
 bool          accelFlag      = false;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// -- Helpers --
 static float clamp(float v, float hi, float lo) {
     if (v > hi) return hi;
     if (v < lo) return lo;
@@ -58,7 +60,7 @@ static bool loadFile(const char *path, void *data, size_t len) {
     return true;
 }
 
-// ─── IMU calibration ─────────────────────────────────────────────────────────
+// -- Calibração do IMU --
 static void calibrateIMU() {
     Serial.println("Calibrating IMU — hold still...");
     double sumAx = 0, sumAy = 0, sumAz = 0;
@@ -83,15 +85,17 @@ static void calibrateIMU() {
     imuOffsets.gz = sumGz / n;
     elevationAngle = 0.0f;
     saveFile(FILE_IMU_OFFSETS, &imuOffsets, sizeof(imuOffsets));
-    Serial.printf("Calibration done (%d samples). ax=%.4f ay=%.4f az=%.4f gx=%.4f gy=%.4f gz=%.4f\n",
+    Serial.printf("Calibração feita (%d samples). ax=%.4f ay=%.4f az=%.4f gx=%.4f gy=%.4f gz=%.4f\n",
                   n, imuOffsets.ax, imuOffsets.ay, imuOffsets.az,
                   imuOffsets.gx, imuOffsets.gy, imuOffsets.gz);
 }
 
-// ─── MIDI helpers ────────────────────────────────────────────────────────────
+// -- MIDI helpers --
+// https://midi.org/summary-of-midi-1-0-messages
+// https://www.geeksforgeeks.org/cpp/bitmasking-in-cpp/
 static void sendMidi(uint8_t status, uint8_t d1, uint8_t d2) {
     uint8_t pkt[5] = {0x80, 0x80, status, d1, d2};
-    midiChar.notify(pkt, 5);
+    midiChar.notify(pkt, 5); 
 }
 
 static void playNote(uint8_t note, uint8_t channel) {
@@ -102,7 +106,7 @@ static void stopNote(uint8_t note, uint8_t channel) {
     sendMidi(0x80 | (channel & 0x0F), note, 0);
 }
 
-// ─── BLE callbacks ───────────────────────────────────────────────────────────
+// -- BLE callbacks --
 static void onSectionsWrite(uint16_t /*conn*/, BLECharacteristic *chr,
                              uint8_t *data, uint16_t len) {
     if (len == 0 || len > 32) return;
@@ -142,7 +146,7 @@ static void onDisconnect(uint16_t /*conn*/, uint8_t /*reason*/) {
     digitalWrite(LED_BUILTIN, HIGH);
 }
 
-// ─── Setup ───────────────────────────────────────────────────────────────────
+// -- Setup --
 void setup() {
     Serial.begin(115200);
     unsigned long _t = millis();
@@ -159,9 +163,9 @@ void setup() {
     if (imu.begin() != 0)
         Serial.println("IMU error");
 
-    InternalFS.begin();
+    InternalFS.begin(); 
 
-    // IMU calibration — load stored offsets or run first-boot calibration
+    // Calibração IMU
     if (!loadFile(FILE_IMU_OFFSETS, &imuOffsets, sizeof(imuOffsets)))
         calibrateIMU();
     else
@@ -169,7 +173,7 @@ void setup() {
                       imuOffsets.ax, imuOffsets.ay, imuOffsets.az,
                       imuOffsets.gx, imuOffsets.gy, imuOffsets.gz);
 
-    // Load persisted settings
+    // Inicializa configurações já atribuídas em boots anteriores
     uint8_t tmpNotes[32];
     uint16_t tmpLen = 0;
     if (loadFile(FILE_SECTIONS, tmpNotes, sizeof(tmpNotes))) {
@@ -198,7 +202,7 @@ void setup() {
     midiChar.setProperties(CHR_PROPS_READ | CHR_PROPS_WRITE_WO_RESP | CHR_PROPS_NOTIFY);
     midiChar.begin();
 
-    // Sections
+    // Sections characteristic: Seções (Notas)
     sectionsChar.setProperties(CHR_PROPS_READ | CHR_PROPS_WRITE);
     sectionsChar.setMaxLen(32);
     sectionsChar.setWriteCallback(onSectionsWrite);
@@ -206,23 +210,23 @@ void setup() {
     if (notesLen > 0)
         sectionsChar.write(notesBuf, notesLen);
 
-    // Accel sensitivity
+    // Accel sensitivity characteristic: Sensibilidade acelerômetro
     accelSensChar.setProperties(CHR_PROPS_READ | CHR_PROPS_WRITE);
     accelSensChar.setWriteCallback(onAccelSensWrite);
     accelSensChar.begin();
     accelSensChar.write32((int)accelThreshold);
 
-    // Direction flip
+    // Direction flip characteristic: Orientação esquerda/direita 
     dirChar.setProperties(CHR_PROPS_READ | CHR_PROPS_WRITE);
     dirChar.setWriteCallback(onDirWrite);
     dirChar.begin();
     dirChar.write8(flipDir);
 
-    // Status notify
+    // Status notify characteristic
     statusChar.setProperties(CHR_PROPS_NOTIFY);
     statusChar.begin();
 
-    // Calibrate
+    // Calibrate characteristic: Write-only que inicializa rotina de calibragem remotamente
     calibrateChar.setProperties(CHR_PROPS_WRITE);
     calibrateChar.setWriteCallback(onCalibrateWrite);
     calibrateChar.begin();
@@ -237,7 +241,7 @@ void setup() {
     Serial.println("BLE started");
 }
 
-// ─── Loop ────────────────────────────────────────────────────────────────────
+// -- Loop --
 void loop() {
     unsigned long now = millis();
     if (now - lastSent < STATUS_INTERVAL_MS) return;
@@ -254,8 +258,7 @@ void loop() {
     float ax     = imu.readFloatAccelX() - imuOffsets.ax;
     float gyY    = imu.readFloatGyroY()  - imuOffsets.gy;
 
-    // atan2 is stable across the full ±90° range; raw ay/az preserve the
-    // gravity vector magnitude so the denominator never collapses near ±90°
+    // gyro: ângulo de elevação, normalmente vai de valores entre ~ +85 até -85
     float accelElevation = atan2f(-ax, sqrtf(ay_raw*ay_raw + az_raw*az_raw)) * RAD_TO_DEG;
     elevationAngle = CF_ALPHA * (elevationAngle + gyY * dt)
                    + (1.0f - CF_ALPHA) * accelElevation;
@@ -263,7 +266,11 @@ void loop() {
     int gyro = (int)clamp(elevationAngle, GYRO_MAX_DEG, -GYRO_MAX_DEG);
     if (flipDir) gyro = -gyro;
 
-    int accel   = (int)(ax * 1000.0f);
+    // accel: normalmente flutua entre -200 e 200 em repouso
+    float total_g = sqrtf(ax*ax + ay_raw*ay_raw + az_raw*az_raw);
+    int accel     = (int)((total_g - 1.0f) * 1000.0f);
+
+    // Seção (Nota) MIDI atual
     int section = (int)((-gyro + GYRO_MAX_DEG) / (2.0f * GYRO_MAX_DEG) * notesLen);
     if (section >= (int)notesLen) section = (int)notesLen - 1;
     if (section < 0)              section = 0;
@@ -273,6 +280,7 @@ void loop() {
         lastPrint = now;
     }
 
+    // Gatilho acelerômetro
     if (!accelFlag && abs(accel) > accelThreshold
         && (now - lastAccel) >= ACCEL_DEBOUNCE_MS) {
         Serial.printf("TRIGGER accel=%d\n", accel);
@@ -286,9 +294,9 @@ void loop() {
     }
 
     if (Bluefruit.Periph.connected()) {
-        statusPkt.gyro_x  = (int16_t)gyro;
-        statusPkt.accel_x = (int16_t)accel;
-        statusPkt.touch   = 0;
+        statusPkt.gyro  = (int16_t)gyro;
+        statusPkt.accel = (int16_t)accel;
+        statusPkt.touch = 0;
         statusChar.notify((uint8_t *)&statusPkt, sizeof(StatusPacket));
     }
 }
