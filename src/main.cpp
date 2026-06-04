@@ -177,13 +177,16 @@ void setup() {
     uint8_t tmpNotes[32];
     uint16_t tmpLen = 0;
     if (loadFile(FILE_SECTIONS, tmpNotes, sizeof(tmpNotes))) {
-        // determine actual len by reading file size
         File f = InternalFS.open(FILE_SECTIONS, FILE_O_READ);
         if (f) { tmpLen = f.size(); f.close(); }
         if (tmpLen > 0 && tmpLen <= 32) {
             memcpy(notesBuf, tmpNotes, tmpLen);
             notesLen = tmpLen;
         }
+    }
+    if (notesLen == 0) {
+        memcpy(notesBuf, DEFAULT_NOTES, DEFAULT_NOTE_COUNT);
+        notesLen = DEFAULT_NOTE_COUNT;
     }
     loadFile(FILE_SENS, &accelThreshold, sizeof(accelThreshold));
     loadFile(FILE_DIR,  &flipDir,        sizeof(flipDir));
@@ -296,7 +299,7 @@ void loop() {
     if (Bluefruit.Periph.connected()) {
         statusPkt.gyro  = (int16_t)gyro;
         statusPkt.accel = (int16_t)accel;
-        statusPkt.touch = 0;
+        statusPkt.touch = 1;
         statusChar.notify((uint8_t *)&statusPkt, sizeof(StatusPacket));
     }
 }

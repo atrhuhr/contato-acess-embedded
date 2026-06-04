@@ -1,9 +1,9 @@
 #pragma once
 
-// ─── Hardware ─────────────────────────────────────────────────────────────────
+// -- Hardware --
 #define I2C_CLOCK_HZ    400000
 
-// ─── BLE ─────────────────────────────────────────────────────────────────────
+// -- BLE --
 static const char *DEVICE_NAME         = "Contato";
 
 // UUIDs do serviço e característica BLE MIDI padrão (especificação Apple / MIDI Association).
@@ -16,25 +16,26 @@ static const char *STATUS_CHAR_UUID    = "f8d968fe-99d7-46c4-a61c-f38093af6ec8";
 static const char *DIR_CHAR_UUID       = "a1b2c3d4-0001-4b33-a751-6ce34ec4c701";
 static const char *CALIBRATE_CHAR_UUID = "b4d0c9f8-3b9a-4a4e-93f2-2a8c9f5ee7a2";
 
-// ─── Persistência LittleFS ───────────────────────────────────────────────────
+// -- Persistência LittleFS --
 static const char *FILE_SECTIONS   = "/sections.bin";
 static const char *FILE_SENS       = "/sens.bin";
 static const char *FILE_DIR        = "/dir.bin";
 static const char *FILE_IMU_OFFSETS= "/imu_offsets.bin";
 
-// ─── Calibração IMU ───────────────────────────────────────────────────────────
+// -- Calibração IMU --
 static const unsigned long CALIB_DURATION_MS = 5000;
 
-// ─── Temporização ────────────────────────────────────────────────────────────
+// -- Temporização --
 static const unsigned long STATUS_INTERVAL_MS = 30;
 static const unsigned long ACCEL_DEBOUNCE_MS  = 2000;
 
-// ─── Sensor ──────────────────────────────────────────────────────────────────
+// -- Sensor --
 static const float GYRO_MAX_DEG = 90.0f;
 
-// ─── Padrões musicais ────────────────────────────────────────────────────────
-static const int     DEFAULT_SECTION_COUNT = 6;
-static const uint8_t DEFAULT_NOTE          = 60;
+// -- Padrões musicais --
+// Escala maior de Dó (C4–C5): 8 seções
+static const uint8_t DEFAULT_NOTES[]      = {60, 62, 64, 65, 67, 69, 71, 72};
+static const uint8_t DEFAULT_NOTE_COUNT   = 8;
 
 static const uint8_t PERC_NOTE    = 36;
 static const uint8_t PERC_CHANNEL = 8;
