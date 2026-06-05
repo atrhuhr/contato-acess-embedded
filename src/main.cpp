@@ -48,7 +48,27 @@ static float clamp(float v, float hi, float lo) {
     return v;
 }
 
+static long readTouch() {
+    long total = 0;
+    for (int i = 0; i < 30; i++) {
+        pinMode(TOUCH_RECV_PIN, OUTPUT);
+        digitalWrite(TOUCH_RECV_PIN, LOW);
+        digitalWrite(TOUCH_SEND_PIN, LOW);
+        delayMicroseconds(10);
+        pinMode(TOUCH_RECV_PIN, INPUT);
+        digitalWrite(TOUCH_SEND_PIN, HIGH);
+        unsigned long t = micros();
+        while (!digitalRead(TOUCH_RECV_PIN) && (micros() - t) < 2000);
+        total += (long)(micros() - t);
+        digitalWrite(TOUCH_SEND_PIN, LOW);
+    }
+    pinMode(TOUCH_RECV_PIN, OUTPUT);
+    digitalWrite(TOUCH_RECV_PIN, LOW);
+    return total / 30;
+}
+
 static void saveFile(const char *path, const void *data, size_t len) {
+    InternalFS.remove(path);
     File f = InternalFS.open(path, FILE_O_WRITE);
     if (f) { f.write((const uint8_t *)data, len); f.close(); }
 }
@@ -282,7 +302,7 @@ void loop() {
     if (section >= (int)notesLen) section = (int)notesLen - 1;
     if (section < 0)              section = 0;
 
-    bool    touch       = statusPkt.touch;
+    bool    touch       = readTouch() < TOUCH_THRESHOLD;
     uint8_t currentNote = (notesLen > 0) ? notesBuf[section] : DEFAULT_NOTES[0];
 
     if (touch) {
@@ -316,7 +336,7 @@ void loop() {
     if (Bluefruit.Periph.connected()) {
         statusPkt.gyro  = (int16_t)gyro;
         statusPkt.accel = (int16_t)accel;
-        statusPkt.touch = 1;
+        statusPkt.touch = touch;
         statusChar.notify((uint8_t *)&statusPkt, sizeof(StatusPacket));
     }
 }

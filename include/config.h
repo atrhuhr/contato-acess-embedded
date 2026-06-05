@@ -1,7 +1,10 @@
 #pragma once
 
 // -- Hardware --
-#define I2C_CLOCK_HZ    400000
+#define I2C_CLOCK_HZ      400000
+#define TOUCH_SEND_PIN    D1
+#define TOUCH_RECV_PIN    D0
+#define TOUCH_THRESHOLD   900   // µs; touch = raw < threshold
 
 // -- BLE --
 static const char *DEVICE_NAME         = "Contato";
