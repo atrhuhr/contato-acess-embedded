@@ -48,25 +48,6 @@ static float clamp(float v, float hi, float lo) {
     return v;
 }
 
-static long readTouch() {
-    long total = 0;
-    for (int i = 0; i < 30; i++) {
-        pinMode(TOUCH_RECV_PIN, OUTPUT);
-        digitalWrite(TOUCH_RECV_PIN, LOW);
-        digitalWrite(TOUCH_SEND_PIN, LOW);
-        delayMicroseconds(10);
-        pinMode(TOUCH_RECV_PIN, INPUT);
-        digitalWrite(TOUCH_SEND_PIN, HIGH);
-        unsigned long t = micros();
-        while (!digitalRead(TOUCH_RECV_PIN) && (micros() - t) < 2000);
-        total += (long)(micros() - t);
-        digitalWrite(TOUCH_SEND_PIN, LOW);
-    }
-    pinMode(TOUCH_RECV_PIN, OUTPUT);
-    digitalWrite(TOUCH_RECV_PIN, LOW);
-    return total / 30;
-}
-
 static void saveFile(const char *path, const void *data, size_t len) {
     InternalFS.remove(path);
     File f = InternalFS.open(path, FILE_O_WRITE);
@@ -302,7 +283,7 @@ void loop() {
     if (section >= (int)notesLen) section = (int)notesLen - 1;
     if (section < 0)              section = 0;
 
-    bool    touch       = readTouch() < TOUCH_THRESHOLD;
+    bool    touch       = true;
     uint8_t currentNote = (notesLen > 0) ? notesBuf[section] : DEFAULT_NOTES[0];
 
     if (touch) {
@@ -324,19 +305,19 @@ void loop() {
     if (!accelFlag && abs(accel) > accelThreshold
         && (now - lastAccel) >= ACCEL_DEBOUNCE_MS) {
         Serial.printf("TRIGGER accel=%d\n", accel);
-        if (Bluefruit.Periph.connected()) playNote(PERC_NOTE, PERC_CHANNEL);
+        if (Bluefruit.Periph.connected()) sendMidi(0x90 | (PERC_CHANNEL & 0x0F), PERC_NOTE, 100);
         accelFlag = true;
         lastAccel = now;
     }
     if (accelFlag && (now - lastAccel) >= ACCEL_DEBOUNCE_MS) {
-        if (Bluefruit.Periph.connected()) stopNote(PERC_NOTE, PERC_CHANNEL);
+        if (Bluefruit.Periph.connected()) sendMidi(0x80 | (PERC_CHANNEL & 0x0F), PERC_NOTE, 0);
         accelFlag = false;
     }
 
     if (Bluefruit.Periph.connected()) {
         statusPkt.gyro  = (int16_t)gyro;
         statusPkt.accel = (int16_t)accel;
-        statusPkt.touch = touch;
+        statusPkt.touch = 1;
         statusChar.notify((uint8_t *)&statusPkt, sizeof(StatusPacket));
     }
 }
