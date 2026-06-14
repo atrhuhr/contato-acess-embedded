@@ -286,6 +286,7 @@ void loop() {
     bool    touch       = true;
     uint8_t currentNote = (notesLen > 0) ? notesBuf[section] : DEFAULT_NOTES[0];
 
+    // Lógica touch 
     if (touch) {
         if (!touchFlag) {
             if (Bluefruit.Periph.connected()) playNote(currentNote, 0);
