@@ -6,6 +6,7 @@
 #include <Wire.h>
 #include "config.h"
 #include "types.h"
+#include "DFRobot_TM6605.h"
 
 using namespace Adafruit_LittleFS_Namespace; // Para usar a classe InternalFS: Sistema de arquivos interno permanente
 
@@ -23,6 +24,9 @@ BLECharacteristic calibrateChar(CALIBRATE_CHAR_UUID);
 // https://wiki.seeedstudio.com/XIAO-BLE-Sense-IMU-Usage/
 LSM6DS3 imu(I2C_MODE, 0x6A);
 
+// -- Haptic --
+DFRobot_TM6605 haptic;
+
 // -- State --
 StatusPacket statusPkt;
 IMUOffsets    imuOffsets     = {};
@@ -35,11 +39,13 @@ int32_t       accelThreshold = DEFAULT_ACCEL_THRESHOLD;
 uint8_t       flipDir        = 1;
 uint8_t       notesBuf[32]   = {};
 uint16_t      notesLen       = 0;
-unsigned long lastSent       = 0;
-unsigned long lastAccel      = 0;
-bool          accelFlag      = false;
-bool          touchFlag      = false;
-uint8_t       lastNote       = 0;
+unsigned long lastSent        = 0;
+unsigned long lastAccel       = 0;
+unsigned long hapticToggleMs  = 0;
+bool          accelFlag       = false;
+bool          touchFlag       = false;
+bool          hapticOn        = false;
+uint8_t       lastNote        = 0;
 
 // -- Helpers --
 static float clamp(float v, float hi, float lo) {
@@ -164,9 +170,21 @@ void setup() {
     digitalWrite(PIN_LSM6DS3TR_C_POWER, HIGH);
     delay(10);
 
+    Wire.begin();
     Wire.setClock(I2C_CLOCK_HZ);
+
     if (imu.begin() != 0)
         Serial.println("IMU error");
+
+    delay(50);
+    if (haptic.begin() != 0)
+        Serial.println("Haptic error");
+    else {
+        haptic.selectEffect(DFRobot_TM6605::eSleepCommand);
+        haptic.play();
+        Serial.println("Haptic OK");
+    }
+    Wire.setClock(I2C_CLOCK_HZ);
 
     InternalFS.begin(); 
 
@@ -300,6 +318,21 @@ void loop() {
             if (Bluefruit.Periph.connected()) stopNote(lastNote, 0);
             touchFlag = false;
         }
+    }
+
+    // Haptic: PWM at noteFreq/8 while note is held (preserves interval ratios, lands in 33–65 Hz tactile range)
+    if (touchFlag) {
+        float noteFreq   = 440.0f * powf(2.0f, (float)(lastNote - 69) / 12.0f);
+        unsigned long halfMs = (unsigned long)max(3.0f, 4000.0f / noteFreq);
+        if (now - hapticToggleMs >= halfMs) {
+            hapticOn = !hapticOn;
+            haptic.selectEffect(hapticOn ? DFRobot_TM6605::eSoftNoise
+                                         : DFRobot_TM6605::eSleepCommand);
+            hapticToggleMs = now;
+        }
+    } else if (hapticOn) {
+        haptic.selectEffect(DFRobot_TM6605::eSleepCommand);
+        hapticOn = false;
     }
 
     // Gatilho acelerômetro
