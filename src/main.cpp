@@ -177,14 +177,13 @@ void setup() {
         Serial.println("IMU error");
 
     delay(50);
-    if (haptic.begin() != 0)
-        Serial.println("Haptic error");
-    else {
-        haptic.selectEffect(DFRobot_TM6605::eSleepCommand);
-        haptic.play();
-        Serial.println("Haptic OK");
-    }
+    // begin() reinitializes Wire internally; skip it and drive the chip directly.
+    // stop() kills any state retained across MCU reset, then arm play+sleep.
+    haptic.stop();
+    haptic.play();
+    haptic.selectEffect(DFRobot_TM6605::eSleepCommand);
     Wire.setClock(I2C_CLOCK_HZ);
+    Serial.println("Haptic init done");
 
     InternalFS.begin(); 
 
@@ -304,14 +303,18 @@ void loop() {
     bool    touch       = true;
     uint8_t currentNote = (notesLen > 0) ? notesBuf[section] : DEFAULT_NOTES[0];
 
-    // Lógica touch 
+    uint8_t prevNote = lastNote;
+
+    // Lógica touch
     if (touch) {
         if (!touchFlag) {
             if (Bluefruit.Periph.connected()) playNote(currentNote, 0);
+            else lastNote = currentNote;
             touchFlag = true;
         }
         if (currentNote != lastNote) {
             if (Bluefruit.Periph.connected()) { stopNote(lastNote, 0); playNote(currentNote, 0); }
+            else lastNote = currentNote;
         }
     } else {
         if (touchFlag) {
@@ -320,18 +323,30 @@ void loop() {
         }
     }
 
-    // Haptic: PWM at noteFreq/8 while note is held (preserves interval ratios, lands in 33–65 Hz tactile range)
+    // if (currentNote != prevNote) {
+    //     haptic.play();
+    //     haptic.selectEffect(DFRobot_TM6605::eSharpClick);
+    // }
+
+    // Haptic PWM: toggle eSoftNoise/stop at noteFreq/8, reset phase on note change
     if (touchFlag) {
-        float noteFreq   = 440.0f * powf(2.0f, (float)(lastNote - 69) / 12.0f);
-        unsigned long halfMs = (unsigned long)max(3.0f, 4000.0f / noteFreq);
-        if (now - hapticToggleMs >= halfMs) {
-            hapticOn = !hapticOn;
-            haptic.selectEffect(hapticOn ? DFRobot_TM6605::eSoftNoise
-                                         : DFRobot_TM6605::eSleepCommand);
+        if (currentNote != prevNote) {
+            haptic.play();
+            haptic.selectEffect(DFRobot_TM6605::eSoftNoise);
+            hapticOn = true;
             hapticToggleMs = now;
+        } else {
+            float noteFreq = 440.0f * powf(2.0f, (float)(lastNote - 69) / 12.0f);
+            unsigned long halfMs = (unsigned long)max(3.0f, 4000.0f / noteFreq);
+            if (now - hapticToggleMs >= halfMs) {
+                hapticOn = !hapticOn;
+                if (hapticOn) { haptic.play(); haptic.selectEffect(DFRobot_TM6605::eSoftNoise); }
+                else           { haptic.stop(); }
+                hapticToggleMs = now;
+            }
         }
     } else if (hapticOn) {
-        haptic.selectEffect(DFRobot_TM6605::eSleepCommand);
+        haptic.stop();
         hapticOn = false;
     }
 
