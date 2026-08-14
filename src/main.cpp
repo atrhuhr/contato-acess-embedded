@@ -41,10 +41,8 @@ uint8_t       notesBuf[32]   = {};
 uint16_t      notesLen       = 0;
 unsigned long lastSent        = 0;
 unsigned long lastAccel       = 0;
-unsigned long hapticToggleMs  = 0;
 bool          accelFlag       = false;
 bool          touchFlag       = false;
-bool          hapticOn        = false;
 uint8_t       lastNote        = 0;
 
 // -- Helpers --
@@ -177,8 +175,7 @@ void setup() {
         Serial.println("IMU error");
 
     delay(50);
-    // begin() reinitializes Wire internally; skip it and drive the chip directly.
-    // stop() kills any state retained across MCU reset, then arm play+sleep.
+    Wire.setClock(100000);
     haptic.stop();
     haptic.play();
     haptic.selectEffect(DFRobot_TM6605::eSleepCommand);
@@ -323,31 +320,11 @@ void loop() {
         }
     }
 
-    // if (currentNote != prevNote) {
-    //     haptic.play();
-    //     haptic.selectEffect(DFRobot_TM6605::eSharpClick);
-    // }
-
-    // Haptic PWM: toggle eSoftNoise/stop at noteFreq/8, reset phase on note change
-    if (touchFlag) {
-        if (currentNote != prevNote) {
-            haptic.play();
-            haptic.selectEffect(DFRobot_TM6605::eSoftNoise);
-            hapticOn = true;
-            hapticToggleMs = now;
-        } else {
-            float noteFreq = 440.0f * powf(2.0f, (float)(lastNote - 69) / 12.0f);
-            unsigned long halfMs = (unsigned long)max(3.0f, 4000.0f / noteFreq);
-            if (now - hapticToggleMs >= halfMs) {
-                hapticOn = !hapticOn;
-                if (hapticOn) { haptic.play(); haptic.selectEffect(DFRobot_TM6605::eSoftNoise); }
-                else           { haptic.stop(); }
-                hapticToggleMs = now;
-            }
-        }
-    } else if (hapticOn) {
-        haptic.stop();
-        hapticOn = false;
+    if (currentNote != prevNote) {
+        Wire.setClock(100000);
+        haptic.play();
+        haptic.selectEffect(DFRobot_TM6605::eSharpClick);
+        Wire.setClock(I2C_CLOCK_HZ);
     }
 
     // Gatilho acelerômetro
