@@ -1,0 +1,64 @@
+#######################################
+# Syntax Coloring Map For Grove - TM6605
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+DFRobot_TM6605	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+begin	KEYWORD2
+play	KEYWORD2
+stop	KEYWORD2
+selectEffect	KEYWORD2
+#######################################
+# Constants (LITERAL1)
+#######################################
+eSharpClick	LITERAL1
+eInstantClick	LITERAL1
+eLightTap	LITERAL1
+eDoubleClick	LITERAL1
+eLightPulse	LITERAL1
+eStrongAlert	LITERAL1
+eMediumDurationAlert	LITERAL1
+eSharpClick2	LITERAL1
+eMediumClick	LITERAL1
+eFlashStrike	LITERAL1
+eDoubleHighClickShort	LITERAL1
+eDoubleMediumClickShort	LITERAL1
+eDoubleFlashStrikeShort	LITERAL1
+eDoubleInstantClickLong	LITERAL1
+eDoubleMediumInstantClickLong	LITERAL1 
+eDoubleFlashStrikeLong	LITERAL1
+eAlert	LITERAL1
+eToggleClick	LITERAL1
+eLongSlowFadeTransition1	LITERAL1
+eLongSlowFadeTransition2	LITERAL1
+eMediumSlowFadeTransition1	LITERAL1
+eMediumSlowFadeTransition2	LITERAL1
+eShortSlowFadeTransition1	LITERAL1
+eShortSlowFadeTransition2	LITERAL1
+eLongFastFadeTransition1	LITERAL1
+eLongFastFadeTransition2	LITERAL1
+eMediumFastFadeTransition1	LITERAL1
+eMediumFastFadeTransition2	LITERAL1
+eShortFastFadeTransition1	LITERAL1
+eShortFastFadeTransition2	LITERAL1
+eLongSlowBoostTransition1	LITERAL1
+eLongSlowBoostTransition2	LITERAL1
+eMediumSlowBoostTransition1	LITERAL1
+eMediumSlowBoostTransition2	LITERAL1
+eShortSlowBoostTransition1	LITERAL1
+eShortSlowBoostTransition2	LITERAL1
+eLongFastBoostTransition1	LITERAL1
+eLongFastBoostTransition2	LITERAL1
+eMediumFastBoostTransition1	LITERAL1
+eMediumFastBoostTransition2	LITERAL1
+eShortFastBoostTransition1	LITERAL1
+eShortFastBoostTransition2	LITERAL1
+eLongAlert	LITERAL1
+eSoftNoise	LITERAL1
+eSleepCommand	LITERAL1

@@ -60,6 +60,30 @@ static void sendMidiMessage(uint8_t status, uint8_t data1, uint8_t data2) {
     pMidiChar->notify();
 }
 
+static void switchNote(byte from, byte to, uint8_t channel = 1) {
+    uint8_t ch = (channel - 1) & 0x0F;
+    lastNote = to;
+    Serial.printf("Nota: %d -> %d (ch %u)\n", from, to, (unsigned)channel);
+    uint16_t ts = (uint16_t)millis();
+    uint8_t header = 0x80 | ((ts >> 7) & 0x3F);
+    uint8_t tsb    = 0x80 | (ts & 0x7F);
+    uint8_t pkt[9] = {header, tsb, (uint8_t)(0x80 | ch), from, 0,
+                                   tsb, (uint8_t)(0x90 | ch), to, 80};
+    pMidiChar->setValue(pkt, sizeof(pkt));
+    pMidiChar->notify();
+}
+
+static void sendMidi2(uint8_t s1, uint8_t a1, uint8_t b1,
+                      uint8_t s2, uint8_t a2, uint8_t b2) {
+    if (!pServer || !pServer->getConnectedCount()) return;
+    uint16_t ts = (uint16_t)millis();
+    uint8_t header = 0x80 | ((ts >> 7) & 0x3F);
+    uint8_t tsb    = 0x80 | (ts & 0x7F);
+    uint8_t pkt[9] = {header, tsb, s1, a1, b1, tsb, s2, a2, b2};
+    pMidiChar->setValue(pkt, sizeof(pkt));
+    pMidiChar->notify();
+}
+
 static void playNote(byte n, uint8_t channel = 1) {
     lastNote = n;
     sendMidiMessage(0x90 | ((channel - 1) & 0x0F), n, 80);
@@ -110,9 +134,10 @@ static bool calibrateAndSaveOffsets() {
 // ─── Callbacks BLE ───────────────────────────────────────────────────────────
 
 class ServerCallbacks : public NimBLEServerCallbacks {
-    void onConnect(NimBLEServer *, NimBLEConnInfo &) override {
+    void onConnect(NimBLEServer *pSrv, NimBLEConnInfo &connInfo) override {
         Serial.println("Client conectado");
         digitalWrite(LED_PIN, HIGH);
+        pSrv->updateConnParams(connInfo.getConnHandle(), 6, 12, 0, 400);
     }
     void onDisconnect(NimBLEServer *, NimBLEConnInfo &, int) override {
         Serial.println("Client desconectado, anunciando");
@@ -328,6 +353,7 @@ void loop() {
     if (dir.size() >= 1 && (bool)dir[0]) gyro = -gyro;
 
     bool touch = touchRead(TOUCH_PIN) < TOUCH_THRESHOLD;
+    touch = 1;
     int  accel = aaReal.x / 10;
 
     // Mapeia a posição do giroscópio para índice de nota no array configurado
@@ -345,11 +371,8 @@ void loop() {
             playNote(currentNote);
             touchFlag = true;
         }
-        if (currentNote != lastNote) {
-            stopNote(lastNote);
-            vTaskDelay(10);
-            playNote(currentNote);
-        }
+        if (currentNote != lastNote)
+            switchNote(lastNote, currentNote);
     } else {
         if (touchFlag) {
             stopNote(lastNote);
