@@ -353,7 +353,6 @@ void loop() {
     if (dir.size() >= 1 && (bool)dir[0]) gyro = -gyro;
 
     bool touch = touchRead(TOUCH_PIN) < TOUCH_THRESHOLD;
-    touch = 1;
     int  accel = aaReal.x / 10;
 
     // Mapeia a posição do giroscópio para índice de nota no array configurado
